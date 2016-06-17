@@ -1,0 +1,9 @@
+# Techstack specific details
+db.hostname=localhost
+db.port=1521
+db.service=xe
+
+
+# Database Login Details
+db.username=sys
+db.password=
