@@ -4,8 +4,8 @@
   <property name="deployenv" value="DEV" />
   <property file="${basedir}/properties/${deployenv}.deploy.properties" />
   <!--<property name="env.TICKETID" value="123456"/> -->
-  <property name="projectname" value="UtPlSqlProject" />
-  <property name="ticket.path" value="${basedir}/${projectname}/${env.TICKETID}" />
+  <!--property name="projectname" value="UtPlSqlProject" /-->
+  <property name="ticket.path" value="${basedir}/${env.TICKETID}" />
 
 	<!-- Including all the libraries into the lib directory  --> 
 	<path id="antclasspath"> 
