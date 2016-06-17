@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <project name="AXS AUTO DEPLOY AND TEST" basedir="." default="dbexecute" xmlns:if="ant:if" xmlns:unless="ant:unless">
+  <property environment="env"/>
+  <property name="deployenv" value="DEV" />
+  <property file="${basedir}/properties/${deployenv}.deploy.properties" />
+  <property name="env.TICKETID" value="123456"/>
+  <property name="ticket.path" value="${basedir}/${env.TICKETID}" />
+
+	<!-- Including all the libraries into the lib directory  --> 
+	<path id="antclasspath"> 
+		<fileset dir="lib"> 
+			<include name="**/*"/> 
+		</fileset> 
+	</path> 
+	<taskdef resource="net/sf/antcontrib/antlib.xml" classpathref="antclasspath"/>
+
+	
+	<!-- Script info -->
+	<target name="scriptinfo">
+	
+		<echo message="===============================================================================================================" />
+		<echo message="Project: ${antproject}  Version: ${antproject-version}" />
+		<echo message="Created by: Animesh Naskar		Date: 06-May-2016" />
+		<echo message="Purpose: Deploy and Test automation of Oracle Scripts." />
+		<echo message="===============================================================================================================" />
+	</target>
+
+	
+	<!-- Pre-Deploy checks -->
+	<target name="validation">
+		<echo message="======================================== Validating parameters ================================================" />
+		<echo message="Checking for availability of necessary property files." />
+		  <fail message="${deployenv}.deploy.properties is MISSING. Please contact Tech Archs.">
+			<condition>
+			  <not>
+				<available file="${basedir}/properties/${deployenv}.deploy.properties" />
+			  </not>
+			</condition>
+		  </fail>
+		<echo message=" >> ${deployenv}.deploy.properties file is AVAILABLE." />
+    
+		<echo message="Checking for codes for migrations to ${deployenv} in SVN." />
+			<fail message="Ticket ${env.TICKETID} is missing in SVN branch! Please contact SME.">
+				<condition>
+				  <not>
+					<available file="${ticket.path}" type="dir"/>
+				  </not>
+				</condition>
+			</fail>
+		<echo message=" >> Ticket ${env.TICKETID} for migration to ${deployenv} found in SVN branch." />
+    
+		<echo message="Checking db.build.sequence for Ticket ${env.TICKETID} in SVN." />
+			<fail message="db.build.sequence for Ticket ${env.TICKETID} is missing in SVN branch! Please contact SME.">
+				<condition>
+				  <not>
+					<available file="${ticket.path}/db.build.sequence" />
+				  </not>
+				</condition>
+		  </fail>
+		<echo message=" >> db.build.sequence for migration for ticket ${env.TICKETID} to ${deployenv} found in SVN." />
+		
+		
+		<!-- [Start] Added below lines by Sumit -->
+		<echo message="Checking db.ut.sequence for Ticket ${env.TICKETID} in SVN." />
+			<fail message="db.build.sequence for Ticket ${env.TICKETID} is missing in SVN branch! Please contact SME.">
+				<condition>
+				  <not>
+					<available file="${ticket.path}/db.ut.sequence" />
+				  </not>
+				</condition>
+		  </fail>
+		<echo message=" >> db.ut.sequence for migration for ticket ${env.TICKETID} to ${deployenv} found in SVN." />
+    	<!-- [End] Added below lines by Sumit -->
+
+			
+		<echo message="All validation Successfull! Proceeding with deployment." />
+		<echo message="===============================================================================================================" />
+	</target>
+
+
+	<!-- Information section -->
+	<target name="buildinfo" depends="scriptinfo,validation">
+	
+		<echo message="======================================== Runtime information ==================================================" />
+		<echo message="Build No: ${env.BUILD_NUMBER}" />
+		<echo message="Job Name: ${env.JOB_NAME}" />
+		<echo message="Build Tag: ${env.BUILD_TAG}" />
+		<echo message="SVN Revision: ${env.SVN_REVISION}" />
+		<echo message="Build Requestor: ${BUILD_USER}" />
+		<echo message="======================================== Parameter provided ===================================================" />
+		<echo message="Ticket ID: ${env.TICKETID}" />
+		<echo message="======================================== Deployment environment ===============================================" />
+		<echo message="Environment: ${environment} | Product: ${product}" />
+		<echo message="TechStack: ${techstack} " />
+		<echo message="Hostname: ${db.hostname} | Port: ${db.port} | Service: ${db.service}" />
+		<echo message="======================================== UTP environment ======================================================" />
+				<echo message="Hostname: ${dbutp.hostname} | Port: ${dbutp.port} | Service: ${dbutp.service}" />
+		<echo message="===============================================================================================================" />
+	</target>
+
+
+	<!-- Database execute -->
+	<target name="dbexecute" depends="buildinfo">
+
+		<property name="script.root" value="${ticket.path}" />
+
+		<echo message="===============================================================================================================" />
+		<!-- Checking for database connection using '-L' option and for invalid objects if connection succeeds-->
+		<echo message="ORACLE_HOME set as Env ${env.ORACLE_HOME}" />
+		<echo message="Checking databasse connectivity to ${db.service}..." />
+
+		<loadfile property="syspwd" srcfile="${basedir}/properties/sys.cred" />
+
+		<!--
+		<exec executable="sqlplus" failonerror="true"  output="${basedir}/scripts/rmsinvalidobjs.sql.log" >
+			<arg value="-L" />
+			<arg value="system/${db.password}@${db.hostname}:${db.port}/${db.service} "/>
+			<arg value="@${basedir}/scripts/rmsinvalidobjs.sql"/>
+		</exec>
+		-->
+
+		<!--		  
+		<sql
+		  classpath="/u01/mydata/utPlSql/library/ojdbc6.jar" driver="oracle.jdbc.OracleDriver"
+		  url="jdbc:oracle:thin:@@@{db.hostname}:@{db.port}:@{db.service}" 
+		  userid="@{db.username}" 
+		  password="@{db.password}"
+		  src="123456/createcust.sql" />
+			  
+		<echo message="Script createcust.sql execution completed." />					  
+		-->
+			  
+		<!-- Displaying list of files to be deployed. -->
+		<echo message="Loading scripts as provided in -> db.build.sequence" />
+		<loadfile property="seqfile" srcfile="${ticket.path}/db.build.sequence" />
+
+		<for param="scriptname" list="${seqfile}" delimiter="${line.seperator}" trim="true">
+			<sequential>
+				<first id="firstfile">
+				  <fileset dir="${script.root}" includes="**/@{scriptname}" />
+				</first>
+				
+				<if>
+					<contains string="@{scriptname}" substring="#" />
+				<then>
+				  <!-- Just ignore comments-->
+				</then>
+				<elseif>
+					<matches string="${toString:firstfile}" pattern="^$" />
+					<then>
+						<fail message="ERROR: @{scriptname} as mentioned in db.build.sequence NOT FOUND in SVN." />
+					</then>
+				</elseif>
+				<elseif>
+					<matches string="${toString:firstfile}" pattern="^*.(sql|pks|pkb|fnc|prc|trg|tps|tpb|vw)$" />
+					<then>
+						<echo message="Deploying script ${toString:firstfile} .. please wait." />
+						<!-- Execute the script -->
+
+						<exec executable="sqlplus" failonerror="true" errorproperty="exit.status" >
+							<arg value="${db.username}/${db.password}@${db.hostname}:${db.port}/${db.service}"/>
+							<arg value="@${toString:firstfile}"/>
+						</exec>		 
+						<echo message="Script ${toString:firstfile} execution completed." />
+					</then>
+				</elseif>
+					<else>
+						<fail message="ERROR: @{scriptname} has INCORRECT EXTENTION for DB code deployment! Allowed file extentions are [sql|pks|pkb|fnc|prc|trg|tps|tpb|vw]. Please contact SME." />
+					</else>
+				</if>
+			</sequential>
+		</for>
+
+		<echo message="===============================================================================================================" />
+		<!-- Checking objects status after deploy -->
+		<echo message="POST DEPLOY: RECOMPILING for any INVALID objects." />
+
+
+		<!-- 
+		<exec executable="sqlplus" failonerror="true" output="${basedir}/scripts/rmsinvalidcomp.sql.log">
+			<arg value="sys/${syspwd}@${db.hostname}:${db.port}/${db.service} as sysdba"/>
+			<arg value="@${basedir}/scripts/rmsinvalidcomp.sql"/>
+		</exec> 
+		-->		
+		<echo message="===============================================================================================================" />
+
+		<echo message="POST DEPLOY check for INVALID objects" />
+
+		<!-- 
+		<exec executable="sqlplus" failonerror="true"  >
+			<arg value="sys/${syspwd}@${db.hostname}:${db.port}/${db.service} as sysdba"/>
+			<arg value="@${basedir}/scripts/rmsinvalidobjs.sql"/>
+		</exec> 
+		-->
+
+		<!-- 
+		<exec executable="sqlplus" failonerror="true">
+			<arg value="sys/${syspwd}@${db.hostname}:${db.port}/${db.service} as sysdba"/>
+			<arg value="@${basedir}/scripts/rmsinvalidcount.sql"/>
+		</exec> 
+		-->
+		<echo message="===============================================================================================================" />
+
+		<property file="${basedir}/invalid.count" />
+
+		<fail message="ERROR: Build job UNSUCCESSFULL due to presence of INVALID objects after deployment! Contact SME to resolve this in as soon as possible.">
+			<condition>
+				<not>
+					<matches string="${invalidobj.count}" pattern="0" />
+				</not>
+			</condition>
+		</fail>
+		<echo message="===============================================================================================================" />
+
+		
+		
+		<!-- [Start] Added below lines by Sumit -->
+		<!-- Displaying list of files to be tested. -->
+		<echo message="Loading unit test scripts as provided in -> db.ut.sequence" />
+		<loadfile property="sequtfile" srcfile="${ticket.path}/db.ut.sequence" />
+
+		<for param="utscriptname" list="${sequtfile}" delimiter="${line.seperator}" trim="true">
+			<sequential>
+				<first id="firstutfile">
+				  <fileset dir="${script.root}" includes="**/@{utscriptname}" />
+				</first>
+				
+				<if>
+					<contains string="@{utscriptname}" substring="#" />
+				<then>
+				  <!-- Just ignore comments-->
+				</then>
+				<elseif>
+					<matches string="${toString:firstutfile}" pattern="^$" />
+					<then>
+						<fail message="ERROR: @{utscriptname} as mentioned in db.ut.sequence NOT FOUND in SVN." />
+					</then>
+				</elseif>
+				<elseif>
+					<matches string="${toString:firstutfile}" pattern="^*.(sql|pks|pkb|fnc|prc|trg|tps|tpb|vw|tst)$" />
+					<then>
+						<echo message="Deploying script ${toString:firstutfile} .. please wait." />
+						<!-- Execute the script -->
+
+						<exec executable="sqlplus" failonerror="true" errorproperty="utexit.status" >
+							<arg value="${dbutp.username}/${dbutp.password}@${dbutp.hostname}:${dbutp.port}/${dbutp.service}"/>
+							<arg value="@${toString:firstutfile}"/>
+						</exec>		 
+						<echo message="Script ${toString:firstutfile} execution completed." />
+					</then>
+				</elseif>
+					<else>
+						<fail message="ERROR: @{utscriptname} has INCORRECT EXTENTION for DB code deployment! Allowed file extentions are [sql|pks|pkb|fnc|prc|trg|tps|tpb|vw|tst]. Please contact SME." />
+					</else>
+				</if>
+			</sequential>
+		</for>
+		<echo message="===============================================================================================================" />
+		<!-- [Start] Added below lines by Sumit -->
+		
+		
+		
+	</target>
+
+</project>
+
